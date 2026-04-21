@@ -1,0 +1,93 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String
+  email          String    @unique
+  password       String
+  role           Role      @default(KASIR)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  transactions   Transaction[]
+  stockMovements StockMovement[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  name        String
+  description String?
+  price       Int
+  stock       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  transactionItems TransactionItem[]
+  stockMovements   StockMovement[]
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  invoiceNo   String          @unique
+  userId      String
+  user        User            @relation(fields: [userId], references: [id])
+  total       Int
+  paymentMethod PaymentMethod
+  status      TransactionStatus @default(COMPLETED)
+  createdAt   DateTime        @default(now())
+  
+  items       TransactionItem[]
+}
+
+model TransactionItem {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id])
+  quantity      Int
+  priceAtTime   Int
+}
+
+model StockMovement {
+  id          String         @id @default(cuid())
+  productId   String
+  product     Product        @relation(fields: [productId], references: [id])
+  type        MovementType
+  quantity    Int
+  reference   String?
+  userId      String
+  user        User           @relation(fields: [userId], references: [id])
+  createdAt   DateTime       @default(now())
+}
+
+enum Role {
+  ADMIN
+  KASIR
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  QRIS
+}
+
+enum TransactionStatus {
+  COMPLETED
+  CANCELLED
+}
+
+enum MovementType {
+  IN
+  OUT
+}
