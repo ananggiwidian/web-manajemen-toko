@@ -16,8 +16,8 @@ import { Toaster, toast } from "sonner";
 const productSchema = z.object({
   sku: z.string().min(1, "SKU wajib diisi"),
   name: z.string().min(1, "Nama wajib diisi"),
-  price: z.preprocess((val) => Number(val), z.number().positive("Harga harus positif")),
-  stock: z.preprocess((val) => Number(val), z.number().int().min(0, "Stok tidak boleh negatif")),
+  price: z.coerce.number().positive("Harga harus positif"),
+  stock: z.coerce.number().int().min(0, "Stok tidak boleh negatif"),
 });
 
 type ProductForm = z.infer<typeof productSchema>;
