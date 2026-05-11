@@ -44,6 +44,10 @@ model Transaction {
   total       Int
   paymentMethod PaymentMethod
   status      TransactionStatus @default(COMPLETED)
+  paymentStatus PaymentStatus   @default(PENDING)
+  stripeSessionId String?
+  stripePaymentIntentId String?
+  stripeEventId String?
   createdAt   DateTime        @default(now())
   
   items       TransactionItem[]
@@ -85,6 +89,14 @@ enum PaymentMethod {
 enum TransactionStatus {
   COMPLETED
   CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REQUIRES_REVIEW
+  EXPIRED
 }
 
 enum MovementType {
