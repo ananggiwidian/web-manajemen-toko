@@ -84,6 +84,7 @@ enum PaymentMethod {
   CASH
   TRANSFER
   QRIS
+  STRIPE
 }
 
 enum TransactionStatus {
