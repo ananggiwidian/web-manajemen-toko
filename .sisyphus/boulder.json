@@ -1,0 +1,85 @@
+{
+  "active_plan": "C:\\Users\\AndraApta\\Desktop\\projects\\UT\\web-manajemen-toko\\.sisyphus\\plans\\stripe-payment-gateway.md",
+  "started_at": "2026-05-11T17:14:12.145Z",
+  "session_ids": [
+    "ses_1e816c027ffez6pwkxvZ4S5DaI",
+    "ses_1e7ae27e7ffeYpYEiorIUf8xU5",
+    "ses_1e7ae26b6ffeQjKPwzLvQjF3zp",
+    "ses_1e7ae267cffeV6k4R29Xzltv43",
+    "ses_1e7ae2644ffen8ryCyqjV5MqkH"
+  ],
+  "session_origins": {
+    "ses_1e816c027ffez6pwkxvZ4S5DaI": "direct",
+    "ses_1e7ae27e7ffeYpYEiorIUf8xU5": "appended",
+    "ses_1e7ae26b6ffeQjKPwzLvQjF3zp": "appended",
+    "ses_1e7ae267cffeV6k4R29Xzltv43": "appended",
+    "ses_1e7ae2644ffen8ryCyqjV5MqkH": "appended"
+  },
+  "plan_name": "stripe-payment-gateway",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Update Prisma schema for Stripe payment status",
+      "session_id": "ses_1e7f6e303ffevwcJweo7WQPaOv",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-05-11T17:17:24.618Z"
+    },
+    "todo:2": {
+      "task_key": "todo:2",
+      "task_label": "2",
+      "task_title": "Document Stripe env var expectations (plan-only note)",
+      "session_id": "ses_1e7f37f46ffewk54lSqC4j6kfc",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-05-11T17:19:27.761Z"
+    },
+    "todo:3": {
+      "task_key": "todo:3",
+      "task_label": "3",
+      "task_title": "Create Stripe Checkout session API",
+      "session_id": "ses_1e7ed0bd9ffe8PhtaWRPWLNeP1",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-05-11T17:30:24.056Z"
+    },
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Implement Stripe webhook handler (idempotent)",
+      "session_id": "ses_1e7ec0807ffexEb7PPH0lLoCKy",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-05-11T17:29:01.052Z"
+    },
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "Add payment status polling endpoint + PENDING expiry",
+      "session_id": "ses_1e7cbd2ddffe37zrzDZb6UHvQ8",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-05-11T18:04:57.578Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "Update POS UI for Stripe checkout + return polling",
+      "session_id": "ses_1e7b7dd6effeOMqFuSHnP8IsSM",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-05-12T04:17:14.475Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "Plan Compliance Audit — oracle",
+      "session_id": "ses_1e58eebb6ffeUKM5qd2FbGz7As",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-05-12T04:29:05.282Z"
+    }
+  }
+}
