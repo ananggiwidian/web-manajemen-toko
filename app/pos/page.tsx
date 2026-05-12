@@ -33,7 +33,7 @@ interface Product {
   name: string;
   price: number;
   stock: number;
-  imageUrl?: string; // <--- tambahan tempat gambar produk
+  imageUrl?: string; 
 }
 
 export default function POSPage() {
@@ -231,7 +231,6 @@ export default function POSPage() {
 
       {/*  MAIN CONTENT - KIRI 2/3, KANAN 1/3 */}
       <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
-        {/* Panel Kiri: Pencarian & Produk - lebar 2/3 layar */}
         <div className="w-full lg:w-2/3 border-b lg:border-b-0 lg:border-r border-gray-200 bg-white/50 backdrop-blur-sm p-3 md:p-4 overflow-y-auto">
           {/* Search Input */}
           <div className="relative mb-4">
@@ -245,7 +244,6 @@ export default function POSPage() {
             />
           </div>
 
-          {/* Grid Produk - 3 kolom pada desktop */}
           {isLoadingProducts ? (
             <div className="flex justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
@@ -325,7 +323,7 @@ export default function POSPage() {
           )}
         </div>
 
-        {/* Panel Kanan: Keranjang Belanja - lebar 1/3 layar */}
+        {/* Keranjang Belanja  */}
         <div className="w-full lg:w-1/3 flex flex-col bg-white shadow-lg lg:shadow-none">
           <div className="flex-1 overflow-y-auto p-4">
             <div className="flex items-center gap-2 mb-4 sticky top-0 bg-white py-2">
