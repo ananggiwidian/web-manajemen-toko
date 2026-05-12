@@ -22,6 +22,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No items provided" }, { status: 400 });
     }
 
+    // Validate minimum amount (Stripe minimum for IDR is Rp 10,000)
+    const calculatedTotal = items.reduce((sum: number, item: any) => sum + item.priceAtTime * item.quantity, 0);
+    if (calculatedTotal < 10000) {
+      return NextResponse.json(
+        { error: "Total minimum untuk pembayaran Stripe adalah Rp 10.000" },
+        { status: 400 }
+      );
+    }
+
     // Fetch products to get names for Stripe line items
     const productIds = items.map((i: any) => i.productId);
     const products = await prisma.product.findMany({
@@ -36,10 +45,20 @@ export async function POST(req: NextRequest) {
         product_data: {
           name: productMap.get(item.productId) || "Product",
         },
-        unit_amount: item.priceAtTime, // IDR is zero-decimal, so use integer prices directly
+        unit_amount: item.priceAtTime * 100, // IDR uses minor units (sen) in Stripe, multiply by 100
       },
       quantity: item.quantity,
     }));
+
+    // Validate each line item meets Stripe minimum (Rp 10,000 for IDR)
+    for (const item of lineItems) {
+      if (item.price_data.unit_amount < 10000) {
+        return NextResponse.json(
+          { error: `Harga minimum per item untuk Stripe adalah Rp 10.000. Product "${item.price_data.product_data.name}" harga Rp ${item.price_data.unit_amount.toLocaleString()}` },
+          { status: 400 }
+        );
+      }
+    }
 
     // Generate Invoice Number
     const invoiceNo = `INV-${Date.now()}`;
