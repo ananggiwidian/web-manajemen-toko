@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useCartStore } from "@/stores/cartStore";
 import { Button } from "@/components/ui/button";
@@ -34,8 +34,23 @@ interface Product {
 }
 
 export default function POSPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        </div>
+      }
+    >
+      <POSPageContent />
+    </Suspense>
+  );
+}
+
+function POSPageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { items, addItem, updateQuantity, removeItem, clearCart, total } = useCartStore();
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
@@ -138,6 +153,127 @@ export default function POSPage() {
       setIsProcessing(false);
     }
   };
+
+  const handleStripeCheckout = async () => {
+    if (items.length === 0) {
+      toast.error("Keranjang kosong!");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((i) => ({
+            productId: i.id,
+            quantity: i.quantity,
+            priceAtTime: i.price,
+          })),
+          total: total(),
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Gagal membuat sesi Stripe");
+      }
+
+      const data = await res.json();
+      window.location.href = data.url;
+    } catch (error: any) {
+      toast.error(error.message);
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle Stripe return (session_id) or cancel
+  const pollPaymentStatus = useCallback(async (transactionId: string) => {
+    const terminalStates = ["PAID", "FAILED", "EXPIRED", "REQUIRES_REVIEW"];
+    const MAX_POLL_ATTEMPTS = 40; // 40 * 3s = 120s max
+    let currentStatus = "PENDING";
+    let attempts = 0;
+
+    while (!terminalStates.includes(currentStatus) && attempts < MAX_POLL_ATTEMPTS) {
+      await new Promise((r) => setTimeout(r, 3000));
+      attempts++;
+      try {
+        const res = await fetch(`/api/transactions/${transactionId}/payment-status`);
+        const data = await res.json();
+        currentStatus = data.paymentStatus;
+      } catch {
+        // retry on network error
+        continue;
+      }
+    }
+
+    toast.dismiss("stripe-polling");
+
+    if (attempts >= MAX_POLL_ATTEMPTS && !terminalStates.includes(currentStatus)) {
+      toast.warning("Pengecekan pembayaran timeout. Silakan cek laporan untuk status terbaru.");
+      router.replace("/pos");
+      return;
+    }
+
+    switch (currentStatus) {
+      case "PAID":
+        toast.success("Pembayaran Stripe berhasil!");
+        clearCart();
+        break;
+      case "FAILED":
+        toast.error("Pembayaran Stripe gagal");
+        break;
+      case "EXPIRED":
+        toast.warning("Pembayaran Stripe kedaluwarsa");
+        break;
+      case "REQUIRES_REVIEW":
+        toast.info("Pembayaran diterima, stok sedang ditinjau admin");
+        break;
+    }
+
+    router.replace("/pos");
+  }, [clearCart, router]);
+
+  useEffect(() => {
+    const sessionId = searchParams.get("session_id");
+    const cancelled = searchParams.get("cancel");
+
+    if (cancelled) {
+      toast.error("Pembayaran Stripe dibatalkan");
+      router.replace("/pos");
+      return;
+    }
+
+    if (!sessionId) return;
+
+    const handleReturn = async () => {
+      try {
+        const lookupRes = await fetch(`/api/stripe/checkout/status?session_id=${sessionId}`);
+        if (!lookupRes.ok) {
+          toast.error("Gagal menemukan transaksi");
+          router.replace("/pos");
+          return;
+        }
+        const { transactionId, paymentStatus } = await lookupRes.json();
+
+        if (paymentStatus === "PAID") {
+          toast.success("Pembayaran Stripe berhasil!");
+          clearCart();
+          router.replace("/pos");
+          return;
+        }
+
+        toast.loading("Memproses pembayaran...", { id: "stripe-polling" });
+        pollPaymentStatus(transactionId);
+      } catch {
+        toast.error("Gagal memeriksa status pembayaran");
+        router.replace("/pos");
+      }
+    };
+
+    handleReturn();
+  }, [searchParams, clearCart, router, pollPaymentStatus]);
 
   if (status === "loading") {
     return (
@@ -413,6 +549,16 @@ export default function POSPage() {
             >
               <CreditCard className="mr-2 h-5 w-5" />
               {isProcessing ? "Memproses..." : "Bayar & Simpan Transaksi"}
+            </Button>
+
+            <Button
+              onClick={handleStripeCheckout}
+              disabled={isProcessing || items.length === 0}
+              className="w-full rounded-xl border-2 border-indigo-300 bg-white text-indigo-600 hover:bg-indigo-50 font-semibold py-6 transition-all duration-300 mt-2"
+              size="lg"
+            >
+              <CreditCard className="mr-2 h-5 w-5" />
+              {isProcessing ? "Mengalihkan ke Stripe..." : "Bayar dengan Stripe"}
             </Button>
           </div>
         </div>
