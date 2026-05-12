@@ -542,23 +542,13 @@ function POSPageContent() {
             </div>
 
             <Button
-              onClick={handleCheckout}
+              onClick={paymentMethod === "TRANSFER" ? handleStripeCheckout : handleCheckout}
               disabled={isProcessing || items.length === 0}
               className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-6 transition-all duration-300 shadow-md hover:shadow-lg"
               size="lg"
             >
               <CreditCard className="mr-2 h-5 w-5" />
               {isProcessing ? "Memproses..." : "Bayar & Simpan Transaksi"}
-            </Button>
-
-            <Button
-              onClick={handleStripeCheckout}
-              disabled={isProcessing || items.length === 0}
-              className="w-full rounded-xl border-2 border-indigo-300 bg-white text-indigo-600 hover:bg-indigo-50 font-semibold py-6 transition-all duration-300 mt-2"
-              size="lg"
-            >
-              <CreditCard className="mr-2 h-5 w-5" />
-              {isProcessing ? "Mengalihkan ke Stripe..." : "Bayar dengan Stripe"}
             </Button>
           </div>
         </div>
