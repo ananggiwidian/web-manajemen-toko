@@ -25,9 +25,9 @@ import {
   Edit,
   ArrowLeft,
   Search,
+  ImageIcon,
 } from "lucide-react";
 
-// Schema dengan transformasi tipe yang eksplisit
 const productSchema = z.object({
   sku: z.string().min(1, "SKU wajib diisi"),
   name: z.string().min(1, "Nama wajib diisi"),
@@ -46,6 +46,16 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+
+  // State untuk upload gambar (create)
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  
+  // State untuk upload gambar (edit)
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const [editUploading, setEditUploading] = useState(false);
 
   const {
     register,
@@ -91,17 +101,44 @@ export default function ProductsPage() {
     fetchProducts();
   }, []);
 
+  // Fungsi upload gambar ke Supabase
+  const uploadImageToSupabase = async (file: File, productId?: string): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (productId) formData.append("productId", productId);
+    
+    const res = await fetch("/api/products/images", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+    if (res.ok) return data.imageUrl;
+    toast.error(data.error || "Gagal upload gambar");
+    return null;
+  };
+
+  // Create product dengan upload gambar
   const onSubmit = async (data: ProductForm) => {
+    if (uploading) return;
     try {
+      let uploadedImageUrl = null;
+      if (imageFile) {
+        setUploading(true);
+        uploadedImageUrl = await uploadImageToSupabase(imageFile);
+        if (!uploadedImageUrl) return;
+      }
+
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, imageUrl: uploadedImageUrl }),
       });
       if (res.ok) {
         toast.success("Produk berhasil ditambahkan");
         setOpen(false);
         reset();
+        setImageFile(null);
+        setImagePreview(null);
         fetchProducts();
       } else {
         const error = await res.json();
@@ -109,6 +146,8 @@ export default function ProductsPage() {
       }
     } catch (error) {
       toast.error("Terjadi kesalahan");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -130,22 +169,35 @@ export default function ProductsPage() {
     setEditValue("name", product.name);
     setEditValue("price", product.price);
     setEditValue("stock", product.stock);
+    setEditImagePreview(product.imageUrl || null);
+    setEditImageFile(null);
     setEditOpen(true);
   };
 
+  // Update product dengan upload gambar baru (jika ada)
   const handleUpdate = async (data: ProductForm) => {
-    if (!editingProduct) return;
+    if (!editingProduct || editUploading) return;
     try {
+      let uploadedImageUrl = editingProduct.imageUrl; // pakai gambar lama
+      if (editImageFile) {
+        setEditUploading(true);
+        const newUrl = await uploadImageToSupabase(editImageFile, editingProduct.id);
+        if (!newUrl) return;
+        uploadedImageUrl = newUrl;
+      }
+
       const res = await fetch(`/api/products?id=${editingProduct.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, imageUrl: uploadedImageUrl }),
       });
       if (res.ok) {
         toast.success("Produk berhasil diperbarui");
         setEditOpen(false);
         resetEdit();
         setEditingProduct(null);
+        setEditImageFile(null);
+        setEditImagePreview(null);
         fetchProducts();
       } else {
         const error = await res.json();
@@ -153,10 +205,12 @@ export default function ProductsPage() {
       }
     } catch (error) {
       toast.error("Terjadi kesalahan");
+    } finally {
+      setEditUploading(false);
     }
   };
 
-  // Filter produk berdasarkan search
+  // Filter produk
   const filteredProducts = products.filter(
     (p) =>
       p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -246,7 +300,6 @@ export default function ProductsPage() {
                 <DialogTitle className="text-xl font-bold text-gray-800">✨ Tambah Produk Baru</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
-                {/* form fields sama */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
                   <Input placeholder="Contoh: BRG001" {...register("sku")} className="rounded-lg border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200/50" />
@@ -267,10 +320,28 @@ export default function ProductsPage() {
                   <Input type="number" placeholder="Stok" {...register("stock")} className="rounded-lg border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200/50" />
                   {errors.stock && <p className="text-red-500 text-sm mt-1">{errors.stock.message}</p>}
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Gambar Produk</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setImageFile(file);
+                        setImagePreview(URL.createObjectURL(file));
+                      }
+                    }}
+                    className="w-full text-sm text-gray-500 file:mr-2 file:py-2 file:px-3 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                  />
+                  {imagePreview && (
+                    <img src={imagePreview} alt="Preview" className="mt-2 h-20 w-20 object-cover rounded-md" />
+                  )}
+                </div>
                 <div className="flex gap-3 pt-2">
                   <Button type="button" variant="outline" onClick={() => setOpen(false)} className="flex-1 rounded-full">Batal</Button>
-                  <Button type="submit" disabled={isSubmitting} className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-full">
-                    {isSubmitting ? "Menyimpan..." : "Simpan Produk"}
+                  <Button type="submit" disabled={isSubmitting || uploading} className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-full">
+                    {isSubmitting || uploading ? "Menyimpan..." : "Simpan Produk"}
                   </Button>
                 </div>
               </form>
@@ -301,6 +372,7 @@ export default function ProductsPage() {
               <Table>
                 <TableHeader className="bg-indigo-50/50">
                   <TableRow>
+                    <TableHead className="font-semibold text-gray-700">Gambar</TableHead>
                     <TableHead className="font-semibold text-gray-700">SKU</TableHead>
                     <TableHead className="font-semibold text-gray-700">Nama Produk</TableHead>
                     <TableHead className="font-semibold text-gray-700">Harga</TableHead>
@@ -311,7 +383,7 @@ export default function ProductsPage() {
                 <TableBody>
                   {filteredProducts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12 text-gray-400">
+                      <TableCell colSpan={6} className="text-center py-12 text-gray-400">
                         <Package className="h-10 w-10 mx-auto mb-2 opacity-30" />
                         Tidak ada produk ditemukan
                       </TableCell>
@@ -319,6 +391,15 @@ export default function ProductsPage() {
                   ) : (
                     filteredProducts.map((p) => (
                       <TableRow key={p.id} className="hover:bg-indigo-50/30 transition">
+                        <TableCell>
+                          {p.imageUrl ? (
+                            <img src={p.imageUrl} alt={p.name} className="h-10 w-10 object-cover rounded-md" />
+                          ) : (
+                            <div className="h-10 w-10 bg-gray-100 rounded-md flex items-center justify-center text-gray-400">
+                              <ImageIcon className="h-5 w-5" />
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono text-sm">{p.sku}</TableCell>
                         <TableCell className="font-medium">{p.name}</TableCell>
                         <TableCell className="text-indigo-600 font-semibold">Rp {p.price.toLocaleString()}</TableCell>
@@ -352,25 +433,36 @@ export default function ProductsPage() {
               ) : (
                 filteredProducts.map((p) => (
                   <div key={p.id} className="bg-white border border-indigo-100 rounded-xl p-4 shadow-sm hover:shadow-md transition">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-mono text-xs text-gray-400 bg-gray-100 inline-block px-2 py-0.5 rounded">{p.sku}</div>
-                        <h3 className="font-semibold text-gray-800 mt-2">{p.name}</h3>
+                    <div className="flex gap-3">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="h-16 w-16 object-cover rounded-lg" />
+                      ) : (
+                        <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                          <ImageIcon className="h-6 w-6" />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-mono text-xs text-gray-400 bg-gray-100 inline-block px-2 py-0.5 rounded">{p.sku}</div>
+                            <h3 className="font-semibold text-gray-800 mt-2">{p.name}</h3>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => handleEdit(p)} className="rounded-full border-indigo-200 text-indigo-600 h-8 w-8 p-0">
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => handleDelete(p.id)} className="rounded-full bg-red-500 hover:bg-red-600 h-8 w-8 p-0">
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex justify-between items-center">
+                          <span className="text-indigo-600 font-bold text-lg">Rp {p.price.toLocaleString()}</span>
+                          <span className={`text-sm font-medium px-2 py-1 rounded-full ${p.stock <= 5 ? "bg-red-100 text-red-700" : p.stock <= 10 ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}`}>
+                            Stok: {p.stock}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(p)} className="rounded-full border-indigo-200 text-indigo-600 h-8 w-8 p-0">
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => handleDelete(p.id)} className="rounded-full bg-red-500 hover:bg-red-600 h-8 w-8 p-0">
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex justify-between items-center">
-                      <span className="text-indigo-600 font-bold text-lg">Rp {p.price.toLocaleString()}</span>
-                      <span className={`text-sm font-medium px-2 py-1 rounded-full ${p.stock <= 5 ? "bg-red-100 text-red-700" : p.stock <= 10 ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}`}>
-                        Stok: {p.stock}
-                      </span>
                     </div>
                   </div>
                 ))
@@ -406,10 +498,28 @@ export default function ProductsPage() {
                 <Input type="number" placeholder="Stok" {...registerEdit("stock")} className="rounded-lg border-gray-300 focus:border-indigo-300" />
                 {editErrors.stock && <p className="text-red-500 text-sm mt-1">{editErrors.stock.message}</p>}
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Gambar Produk</label>
+                {editImagePreview && (
+                  <img src={editImagePreview} alt="Preview" className="mb-2 h-20 w-20 object-cover rounded-md" />
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setEditImageFile(file);
+                      setEditImagePreview(URL.createObjectURL(file));
+                    }
+                  }}
+                  className="w-full text-sm text-gray-500 file:mr-2 file:py-2 file:px-3 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                />
+              </div>
               <div className="flex gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => setEditOpen(false)} className="flex-1 rounded-full">Batal</Button>
-                <Button type="submit" disabled={isEditSubmitting} className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-full">
-                  {isEditSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
+                <Button type="submit" disabled={isEditSubmitting || editUploading} className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-full">
+                  {isEditSubmitting || editUploading ? "Menyimpan..." : "Simpan Perubahan"}
                 </Button>
               </div>
             </form>

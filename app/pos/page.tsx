@@ -33,18 +33,22 @@ interface Product {
   name: string;
   price: number;
   stock: number;
-  imageUrl?: string; 
+  imageUrl?: string | null;
 }
 
 export default function POSPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { items, addItem, updateQuantity, removeItem, clearCart, total } = useCartStore();
+  const { items, addItem, updateQuantity, removeItem, clearCart, total } =
+    useCartStore();
+
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "TRANSFER" | "QRIS">("CASH");
+  const [paymentMethod, setPaymentMethod] = useState<
+    "CASH" | "TRANSFER" | "QRIS"
+  >("CASH");
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Redirect jika tidak login
@@ -74,6 +78,7 @@ export default function POSPage() {
         setIsLoadingProducts(false);
       }
     };
+
     fetchProducts();
   }, []);
 
@@ -96,12 +101,15 @@ export default function POSPage() {
       toast.error(`Stok ${product.name} habis!`);
       return;
     }
+
     addItem({
       id: product.id,
       sku: product.sku,
       name: product.name,
       price: product.price,
+      imageUrl: product.imageUrl ?? null,
     });
+
     setSearch("");
     toast.success(`${product.name} ditambahkan ke keranjang`);
   };
@@ -113,6 +121,7 @@ export default function POSPage() {
     }
 
     setIsProcessing(true);
+
     try {
       const res = await fetch("/api/transactions", {
         method: "POST",
@@ -170,7 +179,9 @@ export default function POSPage() {
               <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
                 POS Pro
               </h1>
-              <span className="text-xs text-gray-500 hidden sm:inline">Point of Sale System</span>
+              <span className="text-xs text-gray-500 hidden sm:inline">
+                Point of Sale System
+              </span>
             </div>
           </div>
 
@@ -212,7 +223,10 @@ export default function POSPage() {
             <div className="hidden md:flex items-center gap-2 bg-gray-100 rounded-full px-3 py-1.5">
               <User className="h-3.5 w-3.5 text-gray-500" />
               <span className="text-sm text-gray-700">
-                Kasir: <span className="font-semibold text-indigo-700">{session?.user?.name}</span>
+                Kasir:{" "}
+                <span className="font-semibold text-indigo-700">
+                  {session?.user?.name}
+                </span>
               </span>
             </div>
 
@@ -222,14 +236,14 @@ export default function POSPage() {
               onClick={() => router.push("/api/auth/signout")}
               className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 rounded-full"
             >
-              <LogOut className="h-4 w-4 mr-1" />{" "}
+              <LogOut className="h-4 w-4 mr-1" />
               <span className="hidden sm:inline">Logout</span>
             </Button>
           </div>
         </div>
       </header>
 
-      {/*  MAIN CONTENT - KIRI 2/3, KANAN 1/3 */}
+      {/* ========== MAIN CONTENT - KIRI 2/3, KANAN 1/3 ========== */}
       <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
         <div className="w-full lg:w-2/3 border-b lg:border-b-0 lg:border-r border-gray-200 bg-white/50 backdrop-blur-sm p-3 md:p-4 overflow-y-auto">
           {/* Search Input */}
@@ -250,62 +264,88 @@ export default function POSPage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Grid Produk */}
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                 {products.map((product) => (
                   <Card
                     key={product.id}
-                    className="cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-200 border-l-4 border-l-indigo-400 rounded-xl overflow-hidden group"
                     onClick={() => handleAddToCart(product)}
+                    className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/90 backdrop-blur cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200"
                   >
+                    {/* Badge Stock */}
+                    <div className="absolute top-2 right-2 z-10">
+                      <div
+                        className={`px-2 py-1 rounded-full text-[10px] font-semibold shadow-sm ${
+                          product.stock > 0
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-red-100 text-red-600"
+                        }`}
+                      >
+                        {product.stock > 0 ? `${product.stock} Stock` : "Habis"}
+                      </div>
+                    </div>
+
+                    {/* Glow Hover */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-500 bg-gradient-to-br from-indigo-500/5 via-transparent to-purple-500/5 pointer-events-none" />
+
                     {/* Tempat Gambar Produk */}
-                    <div className="relative w-full h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
+                    <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-slate-50 via-white to-indigo-50">
                       {product.imageUrl ? (
-                        <Image
-                          src={product.imageUrl}
-                          alt={product.name}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-300"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        />
+                        <>
+                          <Image
+                            src={product.imageUrl}
+                            alt={product.name}
+                            fill
+                            className="object-contain p-3 transition-transform duration-500 group-hover:scale-110"
+                            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                          />
+                          <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] bg-gradient-to-r from-transparent via-white/40 to-transparent transition-transform duration-1000" />
+                        </>
                       ) : (
-                        <div className="flex flex-col items-center justify-center text-gray-400">
-                          <ImageIcon className="h-10 w-10 mb-1" />
-                          <span className="text-xs">No Image</span>
+                        <div className="flex h-full w-full items-center justify-center text-gray-300">
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="rounded-full bg-gray-100 p-3">
+                              <ImageIcon className="h-6 w-6" />
+                            </div>
+                            <span className="text-[11px] text-gray-400">
+                              No Image
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
 
-                    <CardContent className="p-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-mono text-xs text-gray-400 bg-gray-100 inline-block px-2 py-0.5 rounded">
-                            {product.sku}
-                          </div>
-                          <div className="font-semibold text-gray-800 mt-2 group-hover:text-indigo-600 transition line-clamp-1">
-                            {product.name}
-                          </div>
-                        </div>
-                        <div
-                          className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                            product.stock > 0
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          Stok: {product.stock}
-                        </div>
-                      </div>
-                      <div className="mt-2 flex justify-between items-center">
-                        <span className="text-indigo-600 font-bold text-lg">
-                          Rp {product.price.toLocaleString()}
+                    <CardContent className="relative p-3">
+                      {/* SKU */}
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-[10px] font-mono font-medium text-gray-500">
+                          {product.sku}
                         </span>
+                        <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-300" />
+                      </div>
+
+                      {/* Nama Produk */}
+                      <h3 className="line-clamp-1 text-sm font-semibold text-gray-800 transition-colors duration-300 group-hover:text-indigo-600">
+                        {product.name}
+                      </h3>
+
+                      {/* Bottom */}
+                      <div className="mt-3 flex items-end justify-between">
+                        <div>
+                          <p className="text-lg font-bold tracking-tight text-indigo-600">
+                            Rp {product.price.toLocaleString()}
+                          </p>
+                          <p className="text-[11px] text-gray-400">
+                            Tap untuk tambah
+                          </p>
+                        </div>
+
                         <Button
-                          size="sm"
-                          variant="ghost"
-                          className="rounded-full opacity-0 group-hover:opacity-100 transition"
+                          size="icon"
                           disabled={product.stock <= 0}
+                          className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-md shadow-indigo-200 transition-all duration-300 hover:scale-110 hover:shadow-lg"
                         >
-                          <Plus className="h-4 w-4" />
+                          <Plus className="h-4 w-4 text-white" />
                         </Button>
                       </div>
                     </CardContent>
@@ -316,21 +356,25 @@ export default function POSPage() {
               {products.length === 0 && !isLoadingProducts && (
                 <div className="text-center text-gray-400 py-12 bg-white/60 rounded-xl mt-4">
                   <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                  <p>{search ? "Produk tidak ditemukan" : "Belum ada produk tersedia"}</p>
+                  <p>
+                    {search ? "Produk tidak ditemukan" : "Belum ada produk tersedia"}
+                  </p>
                 </div>
               )}
             </>
           )}
         </div>
 
-        {/* Keranjang Belanja  */}
+        {/* ========== KERANJANG BELANJA ========== */}
         <div className="w-full lg:w-1/3 flex flex-col bg-white shadow-lg lg:shadow-none">
           <div className="flex-1 overflow-y-auto p-4">
-            <div className="flex items-center gap-2 mb-4 sticky top-0 bg-white py-2">
+            <div className="flex items-center gap-2 mb-4 sticky top-0 bg-white py-2 z-10">
               <div className="bg-indigo-100 p-1.5 rounded-lg">
                 <ShoppingCart className="h-5 w-5 text-indigo-600" />
               </div>
-              <h2 className="font-bold text-lg text-gray-800">Keranjang Belanja</h2>
+              <h2 className="font-bold text-lg text-gray-800">
+                Keranjang Belanja
+              </h2>
               {items.length > 0 && (
                 <span className="ml-auto text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">
                   {items.length} item
@@ -346,19 +390,42 @@ export default function POSPage() {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               {items.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between border-b border-gray-100 py-3 hover:bg-gray-50/50 px-2 rounded-lg transition"
+                  className="flex items-center gap-3 border border-gray-100 p-3 rounded-2xl hover:bg-gray-50 transition"
                 >
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-800">{item.name}</div>
-                    <div className="text-sm text-indigo-600 font-semibold">
+                  {/* Gambar Produk di Keranjang */}
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-gray-100">
+                    {item.imageUrl ? (
+                      <Image
+                        src={item.imageUrl}
+                        alt={item.name}
+                        fill
+                        className="object-cover"
+                        sizes="64px"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-gray-400">
+                        <ImageIcon className="h-5 w-5" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-800 line-clamp-1">
+                      {item.name}
+                    </div>
+                    <div className="text-xs text-gray-400 font-mono">
+                      {item.sku}
+                    </div>
+                    <div className="text-sm text-indigo-600 font-semibold mt-1">
                       Rp {item.price.toLocaleString()}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+
+                  <div className="flex items-center gap-2 shrink-0">
                     <Button
                       variant="outline"
                       size="icon"
@@ -367,7 +434,11 @@ export default function POSPage() {
                     >
                       <Minus className="h-3 w-3" />
                     </Button>
-                    <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+
+                    <span className="w-6 text-center text-sm font-medium">
+                      {item.quantity}
+                    </span>
+
                     <Button
                       variant="outline"
                       size="icon"
@@ -376,6 +447,7 @@ export default function POSPage() {
                     >
                       <Plus className="h-3 w-3" />
                     </Button>
+
                     <Button
                       variant="ghost"
                       size="icon"
@@ -394,7 +466,9 @@ export default function POSPage() {
           <div className="border-t border-gray-200 p-4 bg-gradient-to-r from-gray-50 to-white">
             <div className="flex justify-between text-xl font-bold mb-4">
               <span className="text-gray-600">Total:</span>
-              <span className="text-indigo-700 text-2xl">Rp {total().toLocaleString()}</span>
+              <span className="text-indigo-700 text-2xl">
+                Rp {total().toLocaleString()}
+              </span>
             </div>
 
             <div className="grid grid-cols-3 gap-2 mb-4">
