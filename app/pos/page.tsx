@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { useCartStore } from "@/stores/cartStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ import {
   BarChart3,
   Store,
   User,
+  ImageIcon,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 
@@ -31,6 +33,7 @@ interface Product {
   name: string;
   price: number;
   stock: number;
+  imageUrl?: string; // <--- tambahan tempat gambar produk
 }
 
 export default function POSPage() {
@@ -59,8 +62,9 @@ export default function POSPage() {
         const res = await fetch("/api/products");
         if (!res.ok) throw new Error("Gagal memuat produk");
         const data = await res.json();
+        // Asumsikan API sudah mengembalikan field imageUrl (opsional)
         setAllProducts(data);
-        setProducts(data); // tampilkan semua produk di awal
+        setProducts(data);
       } catch (error) {
         console.error(error);
         toast.error("Gagal memuat daftar produk");
@@ -73,7 +77,7 @@ export default function POSPage() {
     fetchProducts();
   }, []);
 
-  // Filter produk berdasarkan input search (client-side)
+  // Filter produk
   useEffect(() => {
     if (search.trim() === "") {
       setProducts(allProducts);
@@ -172,7 +176,6 @@ export default function POSPage() {
 
           {/* Menu & User Area */}
           <div className="flex flex-wrap items-center gap-3">
-            {/* Menu Admin - hanya jika role ADMIN */}
             {session?.user?.role === "ADMIN" && (
               <div className="flex items-center gap-2 bg-indigo-50/50 rounded-full px-3 py-1.5 border border-indigo-100">
                 <Link
@@ -206,7 +209,6 @@ export default function POSPage() {
               </div>
             )}
 
-            {/* Info Kasir */}
             <div className="hidden md:flex items-center gap-2 bg-gray-100 rounded-full px-3 py-1.5">
               <User className="h-3.5 w-3.5 text-gray-500" />
               <span className="text-sm text-gray-700">
@@ -214,7 +216,6 @@ export default function POSPage() {
               </span>
             </div>
 
-            {/* Tombol Logout */}
             <Button
               variant="outline"
               size="sm"
@@ -228,10 +229,10 @@ export default function POSPage() {
         </div>
       </header>
 
-      {/*  MAIN CONTENT  */}
+      {/*  MAIN CONTENT - KIRI 2/3, KANAN 1/3 */}
       <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
-        {/* Panel Kiri: Pencarian & Produk */}
-        <div className="w-full lg:w-1/2 border-b lg:border-b-0 lg:border-r border-gray-200 bg-white/50 backdrop-blur-sm p-3 md:p-4 overflow-y-auto">
+        {/* Panel Kiri: Pencarian & Produk - lebar 2/3 layar */}
+        <div className="w-full lg:w-2/3 border-b lg:border-b-0 lg:border-r border-gray-200 bg-white/50 backdrop-blur-sm p-3 md:p-4 overflow-y-auto">
           {/* Search Input */}
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-400" />
@@ -244,27 +245,45 @@ export default function POSPage() {
             />
           </div>
 
-          {/* Grid Produk */}
+          {/* Grid Produk - 3 kolom pada desktop */}
           {isLoadingProducts ? (
             <div className="flex justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {products.map((product) => (
                   <Card
                     key={product.id}
                     className="cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-200 border-l-4 border-l-indigo-400 rounded-xl overflow-hidden group"
                     onClick={() => handleAddToCart(product)}
                   >
+                    {/* Tempat Gambar Produk */}
+                    <div className="relative w-full h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
+                      {product.imageUrl ? (
+                        <Image
+                          src={product.imageUrl}
+                          alt={product.name}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-300"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-gray-400">
+                          <ImageIcon className="h-10 w-10 mb-1" />
+                          <span className="text-xs">No Image</span>
+                        </div>
+                      )}
+                    </div>
+
                     <CardContent className="p-3">
                       <div className="flex justify-between items-start">
                         <div>
                           <div className="font-mono text-xs text-gray-400 bg-gray-100 inline-block px-2 py-0.5 rounded">
                             {product.sku}
                           </div>
-                          <div className="font-semibold text-gray-800 mt-2 group-hover:text-indigo-600 transition">
+                          <div className="font-semibold text-gray-800 mt-2 group-hover:text-indigo-600 transition line-clamp-1">
                             {product.name}
                           </div>
                         </div>
@@ -299,17 +318,15 @@ export default function POSPage() {
               {products.length === 0 && !isLoadingProducts && (
                 <div className="text-center text-gray-400 py-12 bg-white/60 rounded-xl mt-4">
                   <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                  <p>
-                    {search ? "Produk tidak ditemukan" : "Belum ada produk tersedia"}
-                  </p>
+                  <p>{search ? "Produk tidak ditemukan" : "Belum ada produk tersedia"}</p>
                 </div>
               )}
             </>
           )}
         </div>
 
-        {/* Panel Kanan: Keranjang Belanja */}
-        <div className="w-full lg:w-1/2 flex flex-col bg-white shadow-lg lg:shadow-none">
+        {/* Panel Kanan: Keranjang Belanja - lebar 1/3 layar */}
+        <div className="w-full lg:w-1/3 flex flex-col bg-white shadow-lg lg:shadow-none">
           <div className="flex-1 overflow-y-auto p-4">
             <div className="flex items-center gap-2 mb-4 sticky top-0 bg-white py-2">
               <div className="bg-indigo-100 p-1.5 rounded-lg">
@@ -375,7 +392,7 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Footer Keranjang (Total & Checkout) */}
+          {/* Footer Keranjang */}
           <div className="border-t border-gray-200 p-4 bg-gradient-to-r from-gray-50 to-white">
             <div className="flex justify-between text-xl font-bold mb-4">
               <span className="text-gray-600">Total:</span>
