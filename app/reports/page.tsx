@@ -47,6 +47,15 @@ const getStatusBadge = (status: string) => {
   }
 };
 
+const getPaymentMethodLabel = (method: string): string => {
+  if (method === "STRIPE_TRANSFER") return "Transfer";
+  if (method === "CASH") return "Tunai";
+  if (method === "QRIS") return "QRIS";
+  if (method === "TRANSFER") return "Transfer";
+  if (method === "STRIPE") return "Stripe";
+  return method;
+};
+
 export default function ReportsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -81,7 +90,8 @@ export default function ReportsPage() {
   const totalOmset = transactions.reduce((sum, t) => sum + t.total, 0);
   const totalTransaksi = transactions.length;
   const metodeCount = transactions.reduce((acc, t) => {
-    acc[t.paymentMethod] = (acc[t.paymentMethod] || 0) + 1;
+    const label = getPaymentMethodLabel(t.paymentMethod);
+    acc[label] = (acc[label] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
@@ -124,7 +134,7 @@ export default function ReportsPage() {
           invoiceNo: t.invoiceNo,
           createdAt: new Date(t.createdAt).toLocaleDateString("id-ID"),
           total: `Rp ${t.total.toLocaleString()}`,
-          paymentMethod: t.paymentMethod,
+          paymentMethod: getPaymentMethodLabel(t.paymentMethod),
           paymentStatus: t.paymentStatus,
         })
       );
@@ -160,7 +170,7 @@ export default function ReportsPage() {
           t.invoiceNo,
           new Date(t.createdAt).toLocaleDateString("id-ID"),
           `Rp ${t.total.toLocaleString()}`,
-          t.paymentMethod,
+          getPaymentMethodLabel(t.paymentMethod),
           t.paymentStatus,
         ]),
         startY: 40,
@@ -393,7 +403,7 @@ export default function ReportsPage() {
                         </TableCell>
                         <TableCell>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                            {t.paymentMethod}
+                            {getPaymentMethodLabel(t.paymentMethod)}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -435,7 +445,7 @@ export default function ReportsPage() {
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100">
-                          {t.paymentMethod}
+                          {getPaymentMethodLabel(t.paymentMethod)}
                         </span>
                         <div className="flex items-center gap-1">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(t.paymentStatus)}`}>
