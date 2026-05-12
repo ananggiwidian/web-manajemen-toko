@@ -14,7 +14,24 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json();
+  // body bisa berisi sku, name, price, stock, imageUrl (optional)
   const product = await prisma.product.create({ data: body });
+  return NextResponse.json(product);
+}
+
+export async function PUT(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  
+  const id = req.nextUrl.searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
+  
+  const body = await req.json();
+  // update semua field yang dikirim, termasuk imageUrl
+  const product = await prisma.product.update({
+    where: { id },
+    data: body,
+  });
   return NextResponse.json(product);
 }
 
