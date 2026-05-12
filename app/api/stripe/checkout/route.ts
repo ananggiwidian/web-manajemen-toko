@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         invoiceNo,
         userId: session.user.id,
         total,
-        paymentMethod: "STRIPE",
+        paymentMethod: "STRIPE_TRANSFER",
         paymentStatus: "PENDING",
         stripeSessionId: checkoutSession.id,
         items: {
