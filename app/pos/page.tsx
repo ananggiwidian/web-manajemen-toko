@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { useCartStore } from "@/stores/cartStore";
@@ -37,8 +37,23 @@ interface Product {
 }
 
 export default function POSPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        </div>
+      }
+    >
+      <POSPageContent />
+    </Suspense>
+  );
+}
+
+function POSPageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { items, addItem, updateQuantity, removeItem, clearCart, total } =
     useCartStore();
 
@@ -151,6 +166,127 @@ export default function POSPage() {
       setIsProcessing(false);
     }
   };
+
+  const handleStripeCheckout = async () => {
+    if (items.length === 0) {
+      toast.error("Keranjang kosong!");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((i) => ({
+            productId: i.id,
+            quantity: i.quantity,
+            priceAtTime: i.price,
+          })),
+          total: total(),
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Gagal membuat sesi Stripe");
+      }
+
+      const data = await res.json();
+      window.location.href = data.url;
+    } catch (error: any) {
+      toast.error(error.message);
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle Stripe return (session_id) or cancel
+  const pollPaymentStatus = useCallback(async (transactionId: string) => {
+    const terminalStates = ["PAID", "FAILED", "EXPIRED", "REQUIRES_REVIEW"];
+    const MAX_POLL_ATTEMPTS = 40; // 40 * 3s = 120s max
+    let currentStatus = "PENDING";
+    let attempts = 0;
+
+    while (!terminalStates.includes(currentStatus) && attempts < MAX_POLL_ATTEMPTS) {
+      await new Promise((r) => setTimeout(r, 3000));
+      attempts++;
+      try {
+        const res = await fetch(`/api/transactions/${transactionId}/payment-status`);
+        const data = await res.json();
+        currentStatus = data.paymentStatus;
+      } catch {
+        // retry on network error
+        continue;
+      }
+    }
+
+    toast.dismiss("stripe-polling");
+
+    if (attempts >= MAX_POLL_ATTEMPTS && !terminalStates.includes(currentStatus)) {
+      toast.warning("Pengecekan pembayaran timeout. Silakan cek laporan untuk status terbaru.");
+      router.replace("/pos");
+      return;
+    }
+
+    switch (currentStatus) {
+      case "PAID":
+        toast.success("Pembayaran Stripe berhasil!");
+        clearCart();
+        break;
+      case "FAILED":
+        toast.error("Pembayaran Stripe gagal");
+        break;
+      case "EXPIRED":
+        toast.warning("Pembayaran Stripe kedaluwarsa");
+        break;
+      case "REQUIRES_REVIEW":
+        toast.info("Pembayaran diterima, stok sedang ditinjau admin");
+        break;
+    }
+
+    router.replace("/pos");
+  }, [clearCart, router]);
+
+  useEffect(() => {
+    const sessionId = searchParams.get("session_id");
+    const cancelled = searchParams.get("cancel");
+
+    if (cancelled) {
+      toast.error("Pembayaran Stripe dibatalkan");
+      router.replace("/pos");
+      return;
+    }
+
+    if (!sessionId) return;
+
+    const handleReturn = async () => {
+      try {
+        const lookupRes = await fetch(`/api/stripe/checkout/status?session_id=${sessionId}`);
+        if (!lookupRes.ok) {
+          toast.error("Gagal menemukan transaksi");
+          router.replace("/pos");
+          return;
+        }
+        const { transactionId, paymentStatus } = await lookupRes.json();
+
+        if (paymentStatus === "PAID") {
+          toast.success("Pembayaran Stripe berhasil!");
+          clearCart();
+          router.replace("/pos");
+          return;
+        }
+
+        toast.loading("Memproses pembayaran...", { id: "stripe-polling" });
+        pollPaymentStatus(transactionId);
+      } catch {
+        toast.error("Gagal memeriksa status pembayaran");
+        router.replace("/pos");
+      }
+    };
+
+    handleReturn();
+  }, [searchParams, clearCart, router, pollPaymentStatus]);
 
   if (status === "loading") {
     return (
@@ -275,11 +411,10 @@ export default function POSPage() {
                     {/* Badge Stock */}
                     <div className="absolute top-2 right-2 z-10">
                       <div
-                        className={`px-2 py-1 rounded-full text-[10px] font-semibold shadow-sm ${
-                          product.stock > 0
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-red-100 text-red-600"
-                        }`}
+                        className={`px-2 py-1 rounded-full text-[10px] font-semibold shadow-sm ${product.stock > 0
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-red-100 text-red-600"
+                          }`}
                       >
                         {product.stock > 0 ? `${product.stock} Stock` : "Habis"}
                       </div>
@@ -477,15 +612,14 @@ export default function POSPage() {
                   key={method}
                   variant={paymentMethod === method ? "default" : "outline"}
                   onClick={() => setPaymentMethod(method)}
-                  className={`rounded-full transition-all duration-200 ${
-                    paymentMethod === method
-                      ? method === "CASH"
-                        ? "bg-emerald-600 hover:bg-emerald-700"
-                        : method === "TRANSFER"
+                  className={`rounded-full transition-all duration-200 ${paymentMethod === method
+                    ? method === "CASH"
+                      ? "bg-emerald-600 hover:bg-emerald-700"
+                      : method === "TRANSFER"
                         ? "bg-blue-600 hover:bg-blue-700"
                         : "bg-purple-600 hover:bg-purple-700"
-                      : "border-gray-300 text-gray-600 hover:border-indigo-300"
-                  }`}
+                    : "border-gray-300 text-gray-600 hover:border-indigo-300"
+                    }`}
                 >
                   {method === "CASH" && "Tunai"}
                   {method === "TRANSFER" && "Transfer"}
@@ -495,7 +629,7 @@ export default function POSPage() {
             </div>
 
             <Button
-              onClick={handleCheckout}
+              onClick={paymentMethod === "TRANSFER" ? handleStripeCheckout : handleCheckout}
               disabled={isProcessing || items.length === 0}
               className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-6 transition-all duration-300 shadow-md hover:shadow-lg"
               size="lg"

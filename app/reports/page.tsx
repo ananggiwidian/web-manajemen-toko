@@ -33,7 +33,28 @@ interface Transaction {
   createdAt: string;
   total: number;
   paymentMethod: string;
+  paymentStatus: string;
 }
+
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case "PAID": return "bg-green-100 text-green-700";
+    case "PENDING": return "bg-yellow-100 text-yellow-700";
+    case "FAILED": return "bg-red-100 text-red-700";
+    case "REQUIRES_REVIEW": return "bg-orange-100 text-orange-700";
+    case "EXPIRED": return "bg-gray-100 text-gray-500";
+    default: return "bg-gray-100 text-gray-700";
+  }
+};
+
+const getPaymentMethodLabel = (method: string): string => {
+  if (method === "STRIPE_TRANSFER") return "Transfer";
+  if (method === "CASH") return "Tunai";
+  if (method === "QRIS") return "QRIS";
+  if (method === "TRANSFER") return "Transfer";
+  if (method === "STRIPE") return "Stripe";
+  return method;
+};
 
 export default function ReportsPage() {
   const { data: session, status } = useSession();
@@ -69,9 +90,29 @@ export default function ReportsPage() {
   const totalOmset = transactions.reduce((sum, t) => sum + t.total, 0);
   const totalTransaksi = transactions.length;
   const metodeCount = transactions.reduce((acc, t) => {
-    acc[t.paymentMethod] = (acc[t.paymentMethod] || 0) + 1;
+    const label = getPaymentMethodLabel(t.paymentMethod);
+    acc[label] = (acc[label] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
+
+  const handleRetryStock = async (transactionId: string) => {
+    try {
+      const res = await fetch(`/api/transactions/${transactionId}/retry-stock`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.paymentStatus === "PAID") {
+        toast.success("Stock retry successful - payment confirmed!");
+        setTransactions((prev) =>
+          prev.map((t) => (t.id === transactionId ? { ...t, paymentStatus: "PAID" } : t))
+        );
+      } else if (data.paymentStatus === "REQUIRES_REVIEW") {
+        toast.error("Insufficient stock - still needs review");
+      } else {
+        toast.error(data.error || "Retry failed");
+      }
+    } catch {
+      toast.error("Failed to retry stock");
+    }
+  };
 
   const exportExcel = async () => {
     if (transactions.length === 0) {
@@ -86,13 +127,15 @@ export default function ReportsPage() {
         { header: "Tanggal", key: "createdAt", width: 15 },
         { header: "Total", key: "total", width: 15 },
         { header: "Metode", key: "paymentMethod", width: 12 },
+        { header: "Status Bayar", key: "paymentStatus", width: 18 },
       ];
       transactions.forEach((t) =>
         worksheet.addRow({
           invoiceNo: t.invoiceNo,
           createdAt: new Date(t.createdAt).toLocaleDateString("id-ID"),
           total: `Rp ${t.total.toLocaleString()}`,
-          paymentMethod: t.paymentMethod,
+          paymentMethod: getPaymentMethodLabel(t.paymentMethod),
+          paymentStatus: t.paymentStatus,
         })
       );
       const buffer = await workbook.xlsx.writeBuffer();
@@ -122,12 +165,13 @@ export default function ReportsPage() {
       doc.setFontSize(11);
       doc.text(`Tanggal cetak: ${new Date().toLocaleDateString("id-ID")}`, 14, 32);
       autoTable(doc, {
-        head: [["Invoice", "Tanggal", "Total", "Metode"]],
+        head: [["Invoice", "Tanggal", "Total", "Metode", "Status Bayar"]],
         body: transactions.map((t) => [
           t.invoiceNo,
           new Date(t.createdAt).toLocaleDateString("id-ID"),
           `Rp ${t.total.toLocaleString()}`,
-          t.paymentMethod,
+          getPaymentMethodLabel(t.paymentMethod),
+          t.paymentStatus,
         ]),
         startY: 40,
         styles: { fontSize: 9 },
@@ -344,6 +388,7 @@ export default function ReportsPage() {
                       <TableHead>Tanggal</TableHead>
                       <TableHead>Total</TableHead>
                       <TableHead>Metode</TableHead>
+                      <TableHead>Status Bayar</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -358,8 +403,25 @@ export default function ReportsPage() {
                         </TableCell>
                         <TableCell>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                            {t.paymentMethod}
+                            {getPaymentMethodLabel(t.paymentMethod)}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(t.paymentStatus)}`}>
+                              {t.paymentStatus}
+                            </span>
+                            {t.paymentStatus === "REQUIRES_REVIEW" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-xs rounded-full border-orange-200 text-orange-600 hover:bg-orange-50"
+                                onClick={() => handleRetryStock(t.id)}
+                              >
+                                Retry
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -381,9 +443,26 @@ export default function ReportsPage() {
                           {new Date(t.createdAt).toLocaleDateString("id-ID")}
                         </div>
                       </div>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100">
-                        {t.paymentMethod}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100">
+                          {getPaymentMethodLabel(t.paymentMethod)}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(t.paymentStatus)}`}>
+                            {t.paymentStatus}
+                          </span>
+                          {t.paymentStatus === "REQUIRES_REVIEW" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-xs rounded-full border-orange-200 text-orange-600 hover:bg-orange-50"
+                              onClick={() => handleRetryStock(t.id)}
+                            >
+                              Retry
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     <div className="mt-2 text-indigo-600 font-bold text-lg">
                       Rp {t.total.toLocaleString()}
