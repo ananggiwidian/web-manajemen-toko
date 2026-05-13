@@ -412,8 +412,8 @@ function POSPageContent() {
                     <div className="absolute top-2 right-2 z-10">
                       <div
                         className={`px-2 py-1 rounded-full text-[10px] font-semibold shadow-sm ${product.stock > 0
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-red-100 text-red-600"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-red-100 text-red-600"
                           }`}
                       >
                         {product.stock > 0 ? `${product.stock} Stock` : "Habis"}
@@ -613,12 +613,12 @@ function POSPageContent() {
                   variant={paymentMethod === method ? "default" : "outline"}
                   onClick={() => setPaymentMethod(method)}
                   className={`rounded-full transition-all duration-200 ${paymentMethod === method
-                      ? method === "CASH"
-                        ? "bg-emerald-600 hover:bg-emerald-700"
-                        : method === "TRANSFER"
-                          ? "bg-blue-600 hover:bg-blue-700"
-                          : "bg-purple-600 hover:bg-purple-700"
-                      : "border-gray-300 text-gray-600 hover:border-indigo-300"
+                    ? method === "CASH"
+                      ? "bg-emerald-600 hover:bg-emerald-700"
+                      : method === "TRANSFER"
+                        ? "bg-blue-600 hover:bg-blue-700"
+                        : "bg-purple-600 hover:bg-purple-700"
+                    : "border-gray-300 text-gray-600 hover:border-indigo-300"
                     }`}
                 >
                   {method === "CASH" && "Tunai"}
